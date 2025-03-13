@@ -29,6 +29,7 @@ dependencies = [
     "zstandard>=0.20.0",
     "rich>=13.4.2",
     "litellm>=1.63.7",
+    "13.9.4>=13.9.4",
 ]
 
 [project.optional-dependencies]
@@ -42,7 +43,7 @@ dev = [
 ]
 
 [project.scripts]
-doc2talk = "doc2talk.cli:main"
+doc2talk = "doc2talk.__main__:main_entry_point"
 
 [project.urls]
 Homepage = "https://github.com/unclecode/doc2talk"
