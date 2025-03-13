@@ -24,23 +24,55 @@ pip install -r requirements.txt
 
 ## Quick Start
 
+### Command Line Interface
+
 ```bash
 # Basic usage with default repository (Crawl4AI)
-python doc2talk.py
+doc2talk
 
 # Specify custom code and documentation sources
-python doc2talk.py --code /path/to/code --docs /path/to/docs
+doc2talk --code /path/to/code --docs /path/to/docs
 
 # Use a GitHub repository
-python doc2talk.py --code https://github.com/username/repo/tree/main/src --docs https://github.com/username/repo/tree/main/docs
+doc2talk --code https://github.com/username/repo/tree/main/src --docs https://github.com/username/repo/tree/main/docs
 
 # Exclude specific patterns
-python doc2talk.py --exclude "*/tests/*" --exclude "*/node_modules/*"
+doc2talk --exclude "*/tests/*" --exclude "*/node_modules/*"
 
 # Session management
-python doc2talk.py --list                     # List all chat sessions
-python doc2talk.py --continue SESSION_ID      # Continue existing session
-python doc2talk.py --delete SESSION_ID        # Delete a session
+doc2talk --list                     # List all chat sessions
+doc2talk --continue SESSION_ID      # Continue existing session
+doc2talk --delete SESSION_ID        # Delete a session
+```
+
+### Python API
+
+```python
+from doc2talk import Doc2Talk
+
+# Simple usage with default repository
+doc2talk = Doc2Talk()
+response = doc2talk.chat("How does the crawler work?")
+print(response)
+
+# Custom repositories
+doc2talk = Doc2Talk(
+    code_source="/path/to/code",
+    docs_source="/path/to/docs",
+    exclude_patterns=["*/tests/*"]
+)
+
+# Streaming response
+for chunk in doc2talk.chat_stream("What are the main components?"):
+    print(chunk, end="", flush=True)
+
+# Session management
+print(f"Current session: {doc2talk.session_id}")
+sessions = Doc2Talk.list_sessions()
+Doc2Talk.delete_session("session_id")
+
+# Loading from existing index
+doc2talk = Doc2Talk.from_index("/path/to/index.c4ai")
 ```
 
 ## How It Works

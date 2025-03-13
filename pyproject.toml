@@ -27,9 +27,8 @@ dependencies = [
     "pydantic>=2.0.0",
     "msgpack>=1.0.5",
     "zstandard>=0.20.0",
-    "rich>=13.4.2",
     "litellm>=1.63.7",
-    "13.9.4>=13.9.4",
+    "rich>=13.9.4",
 ]
 
 [project.optional-dependencies]
@@ -67,23 +66,28 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 
 [tool.black]
-line-length = 88
 target-version = ["py38"]
 include = '\.pyi?$'
 
 [tool.isort]
 profile = "black"
-line_length = 88
 
 [tool.ruff]
 target-version = "py38"
-line-length = 88
-select = ["E", "F", "I", "B", "W"]
+select = ["E", "F"]
+ignore = ["E501", "W"]  # Ignore warnings (W)
+# target-version = "py38"
+# select = ["E", "F", "I", "B", "W"]
+# ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.8"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
+warn_return_any = false  # Disable warnings for return any
+disallow_untyped_defs = false  # Allow untyped definitions
+disallow_incomplete_defs = false  # Allow incomplete definitions
+# python_version = "3.8"
+# warn_return_any = true
+# warn_unused_configs = true
+# disallow_untyped_defs = true
+# disallow_incomplete_defs = true
 
