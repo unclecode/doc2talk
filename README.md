@@ -1,6 +1,21 @@
-# Doc2Talk
+# 📚💬 Doc2Talk
+
+[![PyPI version](https://badge.fury.io/py/doc2talk.svg)](https://badge.fury.io/py/doc2talk)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Versions](https://img.shields.io/pypi/pyversions/doc2talk.svg)](https://pypi.org/project/doc2talk/)
+[![Downloads](https://static.pepy.tech/badge/doc2talk)](https://pepy.tech/project/doc2talk)
 
 A fast, context-aware code documentation chat interface that provides intelligent responses based on your codebase and documentation.
+
+## The Story Behind Doc2Talk
+
+Doc2Talk was born out of a real need I encountered while developing Crawl4AI (https://github.com/unclecode/crawl4ai). I wanted to provide excellent coding assistance for users with questions about the library and its usage. The tool turned out to be remarkably helpful - smarter and more accurate than many other available solutions.
+
+The key insight was that LLMs need both code and documentation to provide truly helpful responses. By building a knowledge graph that combines the codebase and documentation using embedding and BM25 search, Doc2Talk can intelligently generate context for each user question.
+
+As conversations continue, it efficiently maintains context, adding or removing information as needed to ensure it can answer follow-up questions. The system decides whether to replace, append, or reuse existing context based on the conversation flow.
+
+Currently, Doc2Talk operates in the terminal, with plans for a web version coming soon. I hope this tool proves as helpful for your projects as it has been for mine.
 
 ## Features
 
@@ -34,7 +49,7 @@ pip install -e .
 doc2talk --code /path/to/code --docs /path/to/docs
 
 # Use a GitHub repository
-doc2talk --code https://github.com/username/repo/tree/main/src --docs https://github.com/username/repo/tree/main/docs
+doc2talk --code https://github.com/unclecode/crawl4ai/tree/main/crawl4ai --docs https://github.com/unclecode/crawl4ai/tree/main/docs/md_v2
 
 # Exclude specific patterns
 doc2talk --exclude "*/tests/*" --exclude "*/node_modules/*"
@@ -52,13 +67,11 @@ from doc2talk import Doc2Talk
 
 # Create instance with sources (required)
 doc2talk = Doc2Talk(
-    code_source="https://github.com/unclecode/doc2talk/tree/main/src/doc2talk",
-    docs_source="https://github.com/unclecode/doc2talk/tree/main/docs",
+    code_source="https://github.com/unclecode/crawl4ai/tree/main/crawl4ai",
+    docs_source="https://github.com/unclecode/crawl4ai/tree/main/docs/md_v2",
     exclude_patterns=["*/tests/*"]
 )
 
-# Lazy loading (faster initialization)
-doc2talk = Doc2Talk(code_source="/path/to/code")
 # Build index only when needed (chat operations automatically build the index)
 doc2talk.build_index()  # Or explicitly build index before chatting
 
@@ -89,15 +102,15 @@ doc2talk = Doc2Talk(
     code_source="/path/to/code",
     # Model for context decisions
     decision_llm_config=LLMConfig(
-        model="gpt-3.5-turbo",  # Cheaper model for decisions
-        temprature=0.2,         # Lower temperature for consistency
-        max_tokens=200          # Limit token usage
+        model="gpt-4o",  # Stronger model for context decisions
+        temprature=0.6,         
+        max_tokens=200          
     ),
     # Model for response generation
     generation_llm_config=LLMConfig(
-        model="gpt-4o",         # Better model for responses
-        temprature=0.7,         # Higher temperature for creativity
-        max_tokens=1000         # Allow longer responses
+        model="gpt-4o-mini",    # Cheaper model for responses
+        temprature=0.6,         # Higher temperature for creativity
+        max_tokens=2 ** 12      # Allow longer responses
     )
 )
 
