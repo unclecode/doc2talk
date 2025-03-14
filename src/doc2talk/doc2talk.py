@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import AsyncGenerator, Dict, List, Optional, Union
 
 from .core import ChatEngine, ChatSession, SessionManager
+from .models import LLMConfig
 
 
 class Doc2Talk:
@@ -24,6 +25,10 @@ class Doc2Talk:
         session_id: Optional[str] = None,
         force_rebuild: bool = False,
         build_immediately: bool = False,
+        max_history: int = 50,
+        max_contexts: int = 5,
+        decision_llm_config: Optional[LLMConfig] = None,
+        generation_llm_config: Optional[LLMConfig] = None,
     ):
         """
         Initialize Doc2Talk with optional code and documentation sources.
@@ -36,7 +41,11 @@ class Doc2Talk:
             session_id: ID of an existing session to continue
             force_rebuild: Force rebuilding the knowledge graph
             build_immediately: Whether to build the index immediately (default: False)
-        """
+            max_history: Maximum number of messages to keep in history (default: 50)
+            max_contexts: Maximum number of contexts to keep (default: 5)
+            decision_llm_config: Configuration for the LLM used for context decisions (default: gpt-4o)
+            generation_llm_config: Configuration for the LLM used for response generation (default: gpt-4o-mini)
+        """        
         # Store engine parameters for later initialization
         self._engine_params = {
             "code_source": code_source,
@@ -44,6 +53,10 @@ class Doc2Talk:
             "exclude_patterns": exclude_patterns,
             "cache_id": cache_id,
             "force_rebuild": force_rebuild,
+            "max_history": max_history,
+            "max_contexts": max_contexts,
+            "decision_llm_config": decision_llm_config,
+            "generation_llm_config": generation_llm_config,
         }
         
         # Engine is lazily initialized
@@ -51,9 +64,16 @@ class Doc2Talk:
 
         # Initialize or load session
         if session_id:
-            self.session = SessionManager.load(session_id)
+            self.session = SessionManager.load(
+                session_id,
+                max_history=max_history,
+                max_contexts=max_contexts
+            )
         else:
-            self.session = ChatSession()
+            self.session = ChatSession(
+                max_history=max_history,
+                max_contexts=max_contexts
+            )
             
         # Build index immediately if requested
         if build_immediately:
@@ -125,42 +145,75 @@ class Doc2Talk:
 
         return response
 
-    def chat_stream(self, message: str, model: Optional[str] = None) -> List[str]:
+    def chat_stream(self, message: str, model: Optional[str] = None):
         """
-        Send a message and get a streaming response (returns chunks in a list).
-
+        Send a message and get a streaming response (yields chunks as they arrive).
+        
+        This is a synchronous generator that can be used in a for loop.
+        
         Args:
             message: The user message to send
             model: Optional model override
-
-        Returns:
-            List of response chunks
+            
+        Yields:
+            Response chunks as they become available
         """
         # Ensure engine is initialized
         self._ensure_engine_initialized()
         
         # Add user message
         self.session.add_message("user", message)
-
-        # Get streaming response (gather chunks)
-        chunks = []
-        for chunk in asyncio.run(self._stream_helper(message)):
-            chunks.append(chunk)
-
-        # Add full assistant message
-        full_response = "".join(chunks)
-        self.session.add_message("assistant", full_response)
-
-        # Save session
-        SessionManager.save(self.session)
-
-        return chunks
-
-    async def chat_stream_async(
-        self, message: str, model: Optional[str] = None
-    ) -> AsyncGenerator[str, None]:
+        
+        # Create an event loop in this thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        # Create a queue to pass chunks between async and sync worlds
+        queue = asyncio.Queue()
+        full_response = []
+        
+        # Define a task to collect chunks and put them in the queue
+        async def collector():
+            try:
+                async for chunk in self.engine.generate_response_stream(self.session, message):
+                    await queue.put(chunk)
+                    full_response.append(chunk)
+                # Signal end of stream
+                await queue.put(None)
+            except Exception as e:
+                await queue.put(e)
+                await queue.put(None)
+        
+        # Start the collector task
+        task = loop.create_task(collector())
+        
+        try:
+            # Yield chunks from the queue as they come in
+            while True:
+                chunk = loop.run_until_complete(queue.get())
+                if chunk is None:
+                    break
+                if isinstance(chunk, Exception):
+                    raise chunk
+                yield chunk
+                
+            # Ensure the task is complete
+            loop.run_until_complete(task)
+                
+            # Add assistant message with complete response
+            self.session.add_message("assistant", "".join(full_response))
+            
+            # Save session
+            SessionManager.save(self.session)
+            
+        finally:
+            loop.close()
+            
+    async def chat_stream_async(self, message: str, model: Optional[str] = None):
         """
         Send a message and get a streaming response asynchronously.
+        
+        This is an async generator that can be used in an async for loop.
 
         Args:
             message: The user message to send
@@ -188,14 +241,6 @@ class Doc2Talk:
 
         # Save session
         SessionManager.save(self.session)
-
-    async def _stream_helper(self, message: str) -> AsyncGenerator[str, None]:
-        """Helper method for streaming in sync contexts."""
-        # Ensure engine is initialized
-        self._ensure_engine_initialized()
-        
-        async for chunk in self.engine.generate_response_stream(self.session, message):
-            yield chunk
 
     def get_context_decision(self, question: str) -> str:
         """
@@ -236,6 +281,10 @@ class Doc2Talk:
         Args:
             save_path: Optional path to save the index
         """
+        # If both code and docs sources are NOT provided, raise an error
+        if not self.code_source and not self.docs_source:
+            raise ValueError("At least one of code_source or docs_source must be provided.")
+                
         # Initialize the chat engine if not already done
         if self.engine is None:
             self.engine = ChatEngine(**self._engine_params)
@@ -249,7 +298,11 @@ class Doc2Talk:
     def from_index(
         cls, 
         index_path: Union[str, Path], 
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        max_history: int = 50,
+        max_contexts: int = 5,
+        decision_llm_config: Optional[LLMConfig] = None,
+        generation_llm_config: Optional[LLMConfig] = None,
     ) -> "Doc2Talk":
         """
         Create a Doc2Talk instance from an existing index.
@@ -257,6 +310,10 @@ class Doc2Talk:
         Args:
             index_path: Path to the index file
             session_id: Optional session ID to continue
+            max_history: Maximum number of messages to keep in history (default: 50)
+            max_contexts: Maximum number of contexts to keep (default: 5)
+            decision_llm_config: Configuration for the LLM used for context decisions (default: gpt-4o)
+            generation_llm_config: Configuration for the LLM used for response generation (default: gpt-4o-mini)
 
         Returns:
             Doc2Talk instance
@@ -265,7 +322,12 @@ class Doc2Talk:
         index_path = Path(index_path) if isinstance(index_path, str) else index_path
         
         # Create an instance with default initialization but don't build the index
-        instance = cls()
+        instance = cls(
+            max_history=max_history, 
+            max_contexts=max_contexts,
+            decision_llm_config=decision_llm_config,
+            generation_llm_config=generation_llm_config
+        )
         
         # Store the index path for later loading
         instance._index_path = index_path
@@ -296,9 +358,16 @@ class Doc2Talk:
         
         # Initialize or load session
         if session_id:
-            instance.session = SessionManager.load(session_id)
+            instance.session = SessionManager.load(
+                session_id,
+                max_history=max_history,
+                max_contexts=max_contexts
+            )
         else:
-            instance.session = ChatSession()
+            instance.session = ChatSession(
+                max_history=max_history,
+                max_contexts=max_contexts
+            )
             
         return instance
 

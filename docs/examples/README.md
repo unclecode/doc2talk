@@ -34,7 +34,7 @@ pip install -e .
 doc2talk --code /path/to/code --docs /path/to/docs
 
 # Use a GitHub repository
-doc2talk --code https://github.com/username/repo/tree/main/src --docs https://github.com/username/repo/tree/main/docs
+doc2talk --code https://github.com/unclecode/doc2talk/tree/main/src --docs https://github.com/unclecode/doc2talk/tree/main/docs
 
 # Exclude specific patterns
 doc2talk --exclude "*/tests/*" --exclude "*/node_modules/*"
@@ -52,7 +52,7 @@ from doc2talk import Doc2Talk
 
 # Create instance with sources (required)
 doc2talk = Doc2Talk(
-    code_source="https://github.com/unclecode/doc2talk/tree/main/src/doc2talk",
+    code_source="https://github.com/unclecode/doc2talk/tree/main/src",
     docs_source="https://github.com/unclecode/doc2talk/tree/main/docs",
     exclude_patterns=["*/tests/*"]
 )

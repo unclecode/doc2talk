@@ -22,22 +22,35 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # --- Constants ---
 HOME_DIR = Path.home() / ".doctalk"
 SESSION_DIR = HOME_DIR / "sessions"
-MAX_HISTORY = 50
+DEFAULT_MAX_HISTORY = 50  # Default number of messages to keep
+DEFAULT_MAX_CONTEXTS = 5  # Default number of contexts to keep
 
 
 # --- Core Classes ---
 class ChatSession:
-    def __init__(self, session_id: Optional[str] = None):
+    def __init__(self, 
+                 session_id: Optional[str] = None,
+                 max_history: int = DEFAULT_MAX_HISTORY,
+                 max_contexts: int = DEFAULT_MAX_CONTEXTS):
+        """
+        Initialize a chat session.
+        
+        Args:
+            session_id: Optional session ID to use
+            max_history: Maximum number of messages to keep in history
+            max_contexts: Maximum number of contexts to keep
+        """
         self.session_id = (
             session_id or f"{datetime.now():%Y%m%d-%H%M%S}-{uuid.uuid4().hex[:4]}"
         )
         self.messages: List[Dict] = []
         self.is_new = session_id is None
-        self.context_manager = ContextManager()
+        self.max_history = max_history
+        self.context_manager = ContextManager(max_contexts=max_contexts)
 
     def add_message(self, role: str, content: str):
         self.messages.append({"role": role, "content": content})
-        self.messages = self.messages[-MAX_HISTORY:]
+        self.messages = self.messages[-self.max_history:]
 
 
 class SessionManager:
@@ -57,11 +70,27 @@ class SessionManager:
             )
 
     @staticmethod
-    def load(session_id: str) -> ChatSession:
+    def load(session_id: str, max_history: int = DEFAULT_MAX_HISTORY, 
+             max_contexts: int = DEFAULT_MAX_CONTEXTS) -> ChatSession:
+        """
+        Load a session from disk.
+        
+        Args:
+            session_id: The ID of the session to load
+            max_history: Maximum number of messages to keep in history
+            max_contexts: Maximum number of contexts to keep
+            
+        Returns:
+            The loaded ChatSession
+        """
         path = SESSION_DIR / f"{session_id}.json"
         with open(path) as f:
             data = json.load(f)
-            session = ChatSession(data["id"])
+            session = ChatSession(
+                data["id"], 
+                max_history=max_history,
+                max_contexts=max_contexts
+            )
             session.messages = data["messages"]
             session.context_manager.context_history = data.get("contexts", [])
             session.is_new = False  # Explicitly mark as not new
@@ -99,10 +128,10 @@ class SessionManager:
 
 
 class ContextManager:
-    def __init__(self):
+    def __init__(self, max_contexts: int = 5):
         self.context_history = []
         self.last_action = "none"
-        self.max_contexts = 5  # Keep last 5 contexts
+        self.max_contexts = max_contexts  # Number of contexts to keep
 
     def update(self, new_context: str, mode: str):
         """Update context based on mode (replace|append)"""
@@ -133,7 +162,8 @@ class ContextManager:
 
 
 class ContextDecider:
-    def __init__(self):
+    def __init__(self, llm_config=None):
+        self.llm_config = llm_config
         self.decision_prompt = """Your task is to classify whether we need extra context and knowledge based on a user's question in a chat session with an AI agent. The goal is to optimize and avoid continuously adding new context. Therefore, be very precise in determining if we need new context and classify it into a new category. "New" means that the entire current knowledge context should replace the existing one. However, in many situations, we need both the previous context and the additional one, so you should classify them as "in addition." If there is no need for context related to time, questions, or follow-up questions, classify them as "no context." The goal is to minimize the need for new context. Only when user questions require knowledge referencing back to the Rolfe Rai library should we consider it necessary. Wrap your JSON response in <response> tags.
 
 Analyze if the new question requires:
@@ -153,21 +183,36 @@ Respond ONLY with <response>{{"decision":"new|additional|none"}}</response>"""  
 
     async def decide(self, session: ChatSession, new_question: str):
         try:
-            response = await acompletion(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self.decision_prompt.format(
-                            contexts=session.context_manager.current_context(),
-                            last_question=session.messages[-2]["content"]
-                            if len(session.messages) >= 2
-                            else "",
-                            new_question=new_question,
-                        ),
-                    }
-                ],
-            )
+            # Prepare the message
+            messages = [
+                {
+                    "role": "system",
+                    "content": self.decision_prompt.format(
+                        contexts=session.context_manager.current_context(),
+                        last_question=session.messages[-2]["content"]
+                        if len(session.messages) >= 2
+                        else "",
+                        new_question=new_question,
+                    ),
+                }
+            ]
+            
+            # Start with basic parameters
+            params = {"messages": messages}
+            
+            # Add LLM config parameters if available
+            if self.llm_config:
+                # Use unpacking operator to include all parameters from config
+                config_dict = self.llm_config.to_dict()
+                # Remove None values
+                config_dict = {k: v for k, v in config_dict.items() if v is not None}
+                params.update(config_dict)
+            else:
+                # Default model if no config provided
+                params["model"] = "gpt-4o"
+            
+            # Make the API call
+            response = await acompletion(**params)
 
             # Extract JSON from response
             raw = response.choices[0].message.content
@@ -175,25 +220,25 @@ Respond ONLY with <response>{{"decision":"new|additional|none"}}</response>"""  
             decision = json.loads(json_str)["decision"]
             return decision
 
-        except Exception:
+        except Exception as e:
+            print(f"Context decision error: {e}")
             return "new"  # Fallback to new context
 
 
 class ChatEngine:
     def __init__(
-        self, code_source=None, docs_source=None, exclude_patterns=None, cache_id=None, force_rebuild=False
+        self, code_source=None, docs_source=None, exclude_patterns=None, 
+        cache_id=None, force_rebuild=False, max_history=DEFAULT_MAX_HISTORY,
+        max_contexts=DEFAULT_MAX_CONTEXTS, 
+        decision_llm_config=None, generation_llm_config=None
     ):
         # Centralized cache storage
         self.CACHE_DIR = Path.home() / ".doctalk" / "index"
         self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
         # Default sources if not provided
-        self.code_source = (
-            code_source or "https://github.com/unclecode/crawl4ai/tree/main/crawl4ai"
-        )
-        self.docs_source = (
-            docs_source or "https://github.com/unclecode/crawl4ai/tree/main/docs/md_v2"
-        )
+        self.code_source = code_source
+        self.docs_source = docs_source
         self.exclude_patterns = exclude_patterns or []
 
         # Generate cache ID based on sources or use provided ID
@@ -229,7 +274,12 @@ class ChatEngine:
             self.knowledge_assistant.persist(cache_path)
             print(f"Knowledge graph cached at {cache_path}")
 
-        self.decider = ContextDecider()
+        # Store LLM configs
+        self.decision_llm_config = decision_llm_config
+        self.generation_llm_config = generation_llm_config
+        
+        # Initialize context decider with decision LLM config
+        self.decider = ContextDecider(llm_config=decision_llm_config)
 
     async def get_context_decision(self, session: ChatSession, question: str) -> str:
         """Get context update decision for a question"""
@@ -266,12 +316,25 @@ Use this context:
 
 Answer in markdown."""  # noqa: E501
 
-            response = await acompletion(
-                model="gpt-4o-mini",
-                messages=[{"role": "system", "content": system_msg}]
-                + session.messages[-6:],  # Keep last 3 exchanges
-                stream=True,
-            )
+            # Prepare the messages
+            messages = [{"role": "system", "content": system_msg}] + session.messages[-6:]  # Keep last 3 exchanges
+            
+            # Start with basic parameters
+            params = {"messages": messages, "stream": True}
+            
+            # Add LLM config parameters if available
+            if self.generation_llm_config:
+                # Use unpacking operator to include all parameters from config
+                config_dict = self.generation_llm_config.to_dict()
+                # Remove None values
+                config_dict = {k: v for k, v in config_dict.items() if v is not None}
+                params.update(config_dict)
+            else:
+                # Default model if no config provided
+                params["model"] = "gpt-4o-mini"
+            
+            # Make the API call
+            response = await acompletion(**params)
 
             # Yield streaming response chunks
             async for chunk in response:
@@ -301,12 +364,25 @@ Use this context:
 
 Answer in markdown."""  # noqa: E501
 
-            response = await acompletion(
-                model="gpt-4o-mini",
-                messages=[{"role": "system", "content": system_msg}]
-                + session.messages[-6:],  # Keep last 3 exchanges
-                stream=False,  # Non-streaming mode
-            )
+            # Prepare the messages
+            messages = [{"role": "system", "content": system_msg}] + session.messages[-6:]  # Keep last 3 exchanges
+            
+            # Start with basic parameters
+            params = {"messages": messages, "stream": False}
+            
+            # Add LLM config parameters if available
+            if self.generation_llm_config:
+                # Use unpacking operator to include all parameters from config
+                config_dict = self.generation_llm_config.to_dict()
+                # Remove None values
+                config_dict = {k: v for k, v in config_dict.items() if v is not None}
+                params.update(config_dict)
+            else:
+                # Default model if no config provided
+                params["model"] = "gpt-4o-mini"
+            
+            # Make the API call
+            response = await acompletion(**params)
 
             return response.choices[0].message.content
 
