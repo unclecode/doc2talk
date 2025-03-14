@@ -282,7 +282,7 @@ class Doc2Talk:
             save_path: Optional path to save the index
         """
         # If both code and docs sources are NOT provided, raise an error
-        if not self.code_source and not self.docs_source:
+        if not self._engine_params["code_source"] and not self._engine_params["docs_source"]:
             raise ValueError("At least one of code_source or docs_source must be provided.")
                 
         # Initialize the chat engine if not already done

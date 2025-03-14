@@ -175,3 +175,6 @@ cython_debug/
 
 tmp/
 CLAUDE.md
+
+publish.py
+PUBLISHING.md
