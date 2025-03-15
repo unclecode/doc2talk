@@ -15,7 +15,7 @@ The key insight was that LLMs need both code and documentation to provide truly 
 
 As conversations continue, it efficiently maintains context, adding or removing information as needed to ensure it can answer follow-up questions. The system decides whether to replace, append, or reuse existing context based on the conversation flow.
 
-Currently, Doc2Talk operates in the terminal, with plans for a web version coming soon. I hope this tool proves as helpful for your projects as it has been for mine.
+Doc2Talk operates in both terminal and web interfaces, providing flexibility in how you interact with your codebase. I hope this tool proves as helpful for your projects as it has been for mine.
 
 ## Features
 
@@ -26,7 +26,9 @@ Currently, Doc2Talk operates in the terminal, with plans for a web version comin
 - **Custom LLM Support**: Configure different models for decisions and responses
 - **High-Performance Storage**: Uses optimized serialization for 100x faster loading times
 - **Terminal UI**: Rich terminal interface with interactive streaming responses
+- **Web Interface**: VSCode-inspired web UI with session management, streaming chat, and command palette (⌘⇧P)
 - **Session Management**: Save and restore chat sessions for continuous workflows
+- **Resource Management**: Coming soon! Save and reuse code and documentation sources
 
 ## Installation
 
@@ -59,6 +61,27 @@ doc2talk --list                     # List all chat sessions
 doc2talk --continue SESSION_ID      # Continue existing session
 doc2talk --delete SESSION_ID        # Delete a session
 ```
+
+### Web Interface
+
+```bash
+# Start web server with default settings (localhost:8000)
+doc2talk web
+
+# Specify host and port
+doc2talk web --host 0.0.0.0 --port 8080
+
+# Development mode with hot-reloading
+# In terminal 1:
+doc2talk web --dev
+
+# In terminal 2:
+python build_web.py --dev
+```
+
+For production mode, access the web interface at `http://localhost:8000` (or your specified host:port).
+
+For development mode, access the web interface at `http://localhost:3000`.
 
 ### Python API
 

@@ -1,0 +1,153 @@
+/* Tailwind CSS imports */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #888;
+}
+
+/* Markdown Typography */
+
+/* Headings */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    @apply font-bold mb-4 mt-6;
+}
+
+h1 {
+    @apply text-2xl;
+}
+
+h2 {
+    @apply text-xl;
+}
+
+h3 {
+    @apply text-lg;
+}
+
+/* Paragraphs */
+p {
+    @apply mb-4;
+}
+
+/* Lists */
+ul,
+ol {
+    @apply mb-4 pl-6;
+}
+
+ul {
+    @apply list-disc;
+}
+
+ol {
+    @apply list-decimal;
+}
+
+li {
+    @apply mb-2;
+}
+
+li>ul,
+li>ol {
+    @apply mt-2;
+}
+
+/* Blockquotes */
+blockquote {
+    @apply pl-4 border-l-4 border-gray-600 italic my-4;
+}
+
+/* Horizontal rule */
+hr {
+    @apply my-6 border-gray-700;
+}
+
+/* Tables */
+table {
+    @apply w-full mb-4 border-collapse;
+}
+
+th,
+td {
+    @apply border border-gray-700 px-3 py-2;
+}
+
+th {
+    @apply bg-gray-800;
+}
+
+/* Code blocks */
+pre {
+    @apply bg-[#1e1e1e] p-4 rounded-md overflow-x-auto my-4;
+}
+
+.prose.prose-invert.prose-sm.max-w-none pre {
+    @apply bg-[#1e1e1e] p-4 rounded-md overflow-x-auto my-4;
+}
+
+code {
+    @apply font-mono text-sm;
+}
+
+p code,
+li code,
+td code {
+    @apply bg-[#2d2d2d] text-[#d7ba7d] px-1.5 py-0.5 rounded-md;
+}
+
+/* Links */
+a {
+    @apply text-blue-400 hover:text-blue-300 underline;
+}
+
+/* Transitions */
+.fade-enter {
+    opacity: 0;
+}
+
+.fade-enter-active {
+    opacity: 1;
+    transition: opacity 200ms;
+}
+
+.fade-exit {
+    opacity: 1;
+}
+
+.fade-exit-active {
+    opacity: 0;
+    transition: opacity 200ms;
+}
+
+/* Base styles */
+body {
+    @apply bg-gray-900 text-white;
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+        sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}

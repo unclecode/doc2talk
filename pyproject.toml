@@ -29,6 +29,9 @@ dependencies = [
     "zstandard>=0.20.0",
     "litellm>=1.63.7",
     "rich>=13.9.4",
+    "fastapi>=0.103.0",
+    "uvicorn>=0.22.0",
+    "websockets>=11.0.0",
 ]
 
 [project.optional-dependencies]

@@ -1,4 +1,12 @@
 === Generated Changelog Entry ===
+### [Added] 2025-03-15
+- Added VSCode-inspired web interface with streaming chat
+- Implemented command palette (⌘⇧P) for session management
+- Added settings editor with JSON configuration
+- Added WebSocket support for streaming responses
+- Added FastAPI backend with RESTful endpoints
+
+=== Generated Changelog Entry ===
 ### [Added] 2025-03-13
 - New Doc2Talk facade class for simpler library usage
 - Lazy initialization support for faster startup
